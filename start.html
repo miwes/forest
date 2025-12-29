@@ -1,0 +1,196 @@
+\<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Postupně rostoucí les</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            background: linear-gradient(to bottom, #d1f2ff, #f0faff);
+            font-family: 'Segoe UI', sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #forest-area {
+            flex-grow: 1;
+            position: relative;
+            width: 100%;
+        }
+
+        #ground {
+            height: 15vh;
+            background: #aed581;
+            width: 100%;
+            border-top: 5px solid #9ccc65;
+        }
+
+        .tree {
+            position: absolute;
+            bottom: 0;
+            transform-origin: bottom center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: opacity 1s ease;
+        }
+
+        .trunk {
+            width: 8px;
+            background: #5d4037;
+            border-radius: 2px;
+        }
+
+        .leaves {
+            width: 30px;
+            height: 30px;
+            background: #4caf50;
+            border-radius: 50%;
+            margin-bottom: -5px;
+            box-shadow: inset -5px -5px 10px rgba(0,0,0,0.1);
+            transition: background 2s ease;
+        }
+
+        .tree.dead .leaves { background: #8d6e63 !important; }
+        .tree.dead .trunk { background: #3e2723 !important; }
+
+        .ui {
+            background: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+
+        .main-btn {
+            background: #ff5252;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 15px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #d32f2f;
+        }
+
+        .main-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #d32f2f;
+        }
+
+        #status { font-weight: bold; margin-bottom: 10px; color: #444; }
+    </style>
+</head>
+<body>
+
+<div id="forest-area"></div>
+<div id="ground"></div>
+
+<div class="ui">
+    <div id="status">Připravuji půdu...</div>
+    <button class="main-btn" onclick="killRandomTree()">Nechat strom uschnout</button>
+    <br>
+    <button onclick="resetForest()" style="margin-top: 15px; background: none; border: none; color: #999; cursor: pointer; text-decoration: underline;">Smazat les a začít znovu</button>
+</div>
+
+<script>
+    const forestArea = document.getElementById('forest-area');
+    const status = document.getElementById('status');
+    
+    const MAX_TREES = 10; 
+    const DAYS_PER_TREE = 3; // Jeden strom roste 3 dny (celkem měsíc pro 10 stromů)
+    const MS_PER_TREE = DAYS_PER_TREE * 24 * 60 * 60 * 1000;
+
+    let forestData = JSON.parse(localStorage.getItem('sequentialForest')) || [];
+
+    if (forestData.length === 0) {
+        initForest();
+    }
+
+    function initForest() {
+        forestData = [];
+        const startTime = Date.now();
+        for (let i = 0; i < MAX_TREES; i++) {
+            forestData.push({
+                left: 5 + (i * 9),
+                depth: Math.random() * 30,
+                startGrowTime: startTime + (i * MS_PER_TREE), // Každý strom má odložený start
+                isDead: false
+            });
+        }
+        save();
+    }
+
+    function save() {
+        localStorage.setItem('sequentialForest', JSON.stringify(forestData));
+    }
+
+    function killRandomTree() {
+        const now = Date.now();
+        // Můžeme zabít jen stromy, které už začaly růst a nejsou mrtvé
+        const availableTrees = forestData.filter(t => t.startGrowTime <= now && !t.isDead);
+        
+        if (availableTrees.length > 0) {
+            const randomIndex = Math.floor(Math.random() * availableTrees.length);
+            availableTrees[randomIndex].isDead = true;
+            save();
+            render();
+        }
+    }
+
+    function render() {
+        forestArea.innerHTML = '';
+        const now = Date.now();
+        let growingCount = 0;
+
+        forestData.forEach(data => {
+            // Pokud ještě nenastal čas růstu tohoto stromu, nevykreslíme ho
+            if (now < data.startGrowTime) return;
+
+            growingCount++;
+            const elapsed = now - data.startGrowTime;
+            const progress = Math.min(elapsed / MS_PER_TREE, 1);
+            
+            const treeDiv = document.createElement('div');
+            treeDiv.className = `tree ${data.isDead ? 'dead' : ''}`;
+            treeDiv.style.left = data.left + '%';
+            treeDiv.style.bottom = (data.depth / 2) + 'px';
+            treeDiv.style.zIndex = Math.floor(data.depth);
+
+            const leaves = document.createElement('div');
+            leaves.className = 'leaves';
+            const leafSize = 15 + (progress * 55);
+            leaves.style.width = leafSize + 'px';
+            leaves.style.height = leafSize + 'px';
+
+            const trunk = document.createElement('div');
+            trunk.className = 'trunk';
+            trunk.style.height = (progress * 110) + 'px';
+            trunk.style.width = (3 + progress * 7) + 'px';
+
+            treeDiv.appendChild(leaves);
+            treeDiv.appendChild(trunk);
+            forestArea.appendChild(treeDiv);
+        });
+
+        status.innerText = `Počet stromů v lese: ${growingCount} / ${MAX_TREES}`;
+    }
+
+    function resetForest() {
+        if(confirm("Opravdu smazat celý les?")) {
+            localStorage.removeItem('sequentialForest');
+            initForest();
+            render();
+        }
+    }
+
+    setInterval(render, 1000);
+    render();
+</script>
+
+</body>
+</html>
