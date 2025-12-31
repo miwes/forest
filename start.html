@@ -1,4 +1,4 @@
-\<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
@@ -26,6 +26,20 @@
             background: #aed581;
             width: 100%;
             border-top: 5px solid #9ccc65;
+        }
+
+        /* Styl pro zobrazení data zahájení */
+        #start-date-display {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 10px 15px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            color: #555;
+            border: 1px solid rgba(0,0,0,0.05);
+            pointer-events: none;
         }
 
         .tree {
@@ -87,52 +101,65 @@
 </head>
 <body>
 
-<div id="forest-area"></div>
+<div id="forest-area">
+    <div id="start-date-display">Les založen: <span id="start-date-val">...</span></div>
+</div>
 <div id="ground"></div>
 
 <div class="ui">
     <div id="status">Připravuji půdu...</div>
     <button class="main-btn" onclick="killRandomTree()">Nechat strom uschnout</button>
     <br>
-    <button onclick="resetForest()" style="margin-top: 15px; background: none; border: none; color: #999; cursor: pointer; text-decoration: underline;">Smazat les a začít znovu</button>
 </div>
 
 <script>
     const forestArea = document.getElementById('forest-area');
     const status = document.getElementById('status');
+    const startDateVal = document.getElementById('start-date-val');
     
     const MAX_TREES = 365; 
-    const DAYS_PER_TREE = 1; // Jeden strom roste 3 dny (celkem měsíc pro 10 stromů)
+    const DAYS_PER_TREE = 1; 
     const MS_PER_TREE = DAYS_PER_TREE * 24 * 60 * 60 * 1000;
 
-    let forestData = JSON.parse(localStorage.getItem('sequentialForest')) || [];
+    // Načítáme celý objekt (včetně metadat jako forestStarted)
+    let storage = JSON.parse(localStorage.getItem('sequentialForestData')) || { trees: [], forestStarted: null };
 
-    if (forestData.length === 0) {
+    if (storage.trees.length === 0) {
         initForest();
+    } else {
+        displayStartDate(storage.forestStarted);
     }
 
     function initForest() {
-        forestData = [];
         const startTime = Date.now();
+        storage.forestStarted = startTime;
+        storage.trees = [];
+
         for (let i = 0; i < MAX_TREES; i++) {
-            forestData.push({
-                left: 5 + (i * 9),
+            storage.trees.push({
+                left: 5 + (i * 0.25 * 10), // Trochu upravené rozestupy pro 365 stromů
+                left: (i / MAX_TREES) * 95 + 2, // Rovnoměrnější rozmístění
                 depth: Math.random() * 30,
-                startGrowTime: startTime + (i * MS_PER_TREE), // Každý strom má odložený start
+                startGrowTime: startTime + (i * MS_PER_TREE),
                 isDead: false
             });
         }
+        displayStartDate(startTime);
         save();
     }
 
+    function displayStartDate(timestamp) {
+        const date = new Date(timestamp);
+        startDateVal.innerText = date.toLocaleDateString('cs-CZ') + " v " + date.toLocaleTimeString('cs-CZ', {hour: '2-digit', minute:'2-digit'});
+    }
+
     function save() {
-        localStorage.setItem('sequentialForest', JSON.stringify(forestData));
+        localStorage.setItem('sequentialForestData', JSON.stringify(storage));
     }
 
     function killRandomTree() {
         const now = Date.now();
-        // Můžeme zabít jen stromy, které už začaly růst a nejsou mrtvé
-        const availableTrees = forestData.filter(t => t.startGrowTime <= now && !t.isDead);
+        const availableTrees = storage.trees.filter(t => t.startGrowTime <= now && !t.isDead);
         
         if (availableTrees.length > 0) {
             const randomIndex = Math.floor(Math.random() * availableTrees.length);
@@ -143,12 +170,11 @@
     }
 
     function render() {
-        forestArea.innerHTML = '';
+        forestArea.querySelectorAll('.tree').forEach(n => n.remove());
         const now = Date.now();
         let growingCount = 0;
 
-        forestData.forEach(data => {
-            // Pokud ještě nenastal čas růstu tohoto stromu, nevykreslíme ho
+        storage.trees.forEach(data => {
             if (now < data.startGrowTime) return;
 
             growingCount++;
@@ -163,14 +189,14 @@
 
             const leaves = document.createElement('div');
             leaves.className = 'leaves';
-            const leafSize = 15 + (progress * 55);
+            const leafSize = 10 + (progress * 40); // Trochu zmenšeno, aby se jich tam vešlo 365
             leaves.style.width = leafSize + 'px';
             leaves.style.height = leafSize + 'px';
 
             const trunk = document.createElement('div');
             trunk.className = 'trunk';
-            trunk.style.height = (progress * 110) + 'px';
-            trunk.style.width = (3 + progress * 7) + 'px';
+            trunk.style.height = (progress * 80) + 'px';
+            trunk.style.width = (2 + progress * 5) + 'px';
 
             treeDiv.appendChild(leaves);
             treeDiv.appendChild(trunk);
@@ -182,13 +208,12 @@
 
     function resetForest() {
         if(confirm("Opravdu smazat celý les?")) {
-            localStorage.removeItem('sequentialForest');
-            initForest();
-            render();
+            localStorage.removeItem('sequentialForestData');
+            location.reload(); // Nejjednodušší cesta pro čistý restart
         }
     }
 
-    setInterval(render, 1000);
+    setInterval(render, 10000); // Stačí překreslit každých 10s pro úsporu výkonu
     render();
 </script>
 
