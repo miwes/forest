@@ -101,8 +101,8 @@
     const forestArea = document.getElementById('forest-area');
     const status = document.getElementById('status');
     
-    const MAX_TREES = 10; 
-    const DAYS_PER_TREE = 3; // Jeden strom roste 3 dny (celkem měsíc pro 10 stromů)
+    const MAX_TREES = 365; 
+    const DAYS_PER_TREE = 1; // Jeden strom roste 3 dny (celkem měsíc pro 10 stromů)
     const MS_PER_TREE = DAYS_PER_TREE * 24 * 60 * 60 * 1000;
 
     let forestData = JSON.parse(localStorage.getItem('sequentialForest')) || [];
